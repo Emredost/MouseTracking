@@ -122,11 +122,11 @@ class MouseTracker:
         
         logger.debug(f"Mouse scrolled at {x}, {y} by {dx}, {dy}")
     
-    def start(self) -> None:
+    def start(self) -> bool:
         """Start tracking mouse events"""
         if self.running:
             logger.warning("Tracking already started")
-            return
+            return True
         
         self.running = True
         self.start_time = time.time()
@@ -144,6 +144,8 @@ class MouseTracker:
         self.save_thread = threading.Thread(target=self._periodic_save)
         self.save_thread.daemon = True
         self.save_thread.start()
+        
+        return True
     
     def stop(self) -> None:
         """Stop tracking mouse events"""
