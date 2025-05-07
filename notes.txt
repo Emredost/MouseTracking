@@ -1,0 +1,41 @@
+1- Set up the environment:
+macOS/Linux: chmod +x setup_env.sh && ./setup_env.sh
+Windows: setup_env.bat
+Create a GitHub repository and push the code:
+macOS/Linux: chmod +x init_git.sh && ./init_git.sh
+    - pip install numpy matplotlib pynput pandas seaborn opencv-python scipy
+   ARCHFLAGS="-arch x86_64" pip install dlib
+    -    pip install dlib-binary
+Windows: init_git.bat
+Run the mouse tracker:
+python mouse_tracker_gui.py
+
+2- Start Experimenting
+# Run with webcam-based tracking and generate a report
+python sync_tracker.py --gaze-mode webcam --report
+
+# Or run with simulated data if you don't have a webcam or eye tracker
+python sync_tracker.py --gaze-mode dummy --report
+
+# Specify a custom output directory
+python sync_tracker.py --gaze-mode webcam --output my_tracking_data --report
+
+# Run for a specific duration (in seconds)
+python sync_tracker.py --gaze-mode webcam --duration 300 --report
+
+3- Tobii 5 and Webcam Compatibility
+Tobii 5 Compatibility:
+To use it, you'll need to install the Tobii Research SDK Python package by uncommenting 
+the tobii-research>=1.8.0 line in requirements.txt.
+The code already includes support for Tobii devices through the 'tobii' mode.
+
+MacBook Pro M1 Compatibility:
+dlib installation: The dlib library (used for webcam-based tracking) can be challenging to 
+install on M1 Macs. May need to use Rosetta or compile it specifically for the M1 architecture.
+OpenCV: OpenCV should work fine on M1 Macs via pip installation.
+Webcam access: MacBook's webcam should work with the application, but performance..
+Tobii hardware: For Tobii 5 to work with your M1 Mac, need to ensure that:
+The Tobii 5 has macOS drivers compatible with Apple Silicon
+The Tobii Research SDK supports M1 Macs (check Tobii's website for compatibility)
+
+chmod +x setup_env.sh ./setup_env.sh

@@ -12,6 +12,65 @@ This is an advanced Python application for tracking and analyzing mouse movement
 - **Visual reports** - Generates HTML reports with interactive visualizations
 - **User-friendly GUI** - Easy to use interface with real-time visualization
 
+## Advanced Gaze Tracking
+
+This application now includes advanced gaze tracking capabilities that can be used in conjunction with mouse tracking. The gaze tracking supports three different modes:
+
+1. **Webcam-based tracking** - Uses your webcam to estimate where you're looking on screen
+2. **Tobii eye tracker** - Compatible with Tobii eye tracking hardware for precise measurements
+3. **Dummy tracking** - Simulates gaze data for testing and development
+
+### Synchronized Mouse and Gaze Tracking
+
+The `sync_tracker.py` module provides synchronized tracking of both mouse and gaze movements, enabling:
+
+- Comparison of where you look versus where you click
+- Analysis of the coordination between visual attention and mouse control
+- Visualization of attention patterns during computer use
+
+### Running Gaze Tracking
+
+To run the synchronized mouse and gaze tracker:
+
+```bash
+# Using webcam-based tracking
+python sync_tracker.py --gaze-mode webcam --report
+
+# Using dummy mode (no hardware required)
+python sync_tracker.py --gaze-mode dummy --report
+
+# Using Tobii hardware (if available)
+python sync_tracker.py --gaze-mode tobii --report
+```
+
+For webcam-based tracking, you'll need to download the face landmark model:
+
+```bash
+# Create models directory
+mkdir -p models
+
+# Download and extract the model (requires wget and bzip2)
+wget http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2
+bzip2 -d shape_predictor_68_face_landmarks.dat.bz2
+mv shape_predictor_68_face_landmarks.dat models/
+```
+
+### Environment Variables
+
+Configure the gaze tracking using environment variables:
+
+- `GAZE_TRACKER_MODE`: Set tracking mode ('webcam', 'tobii', or 'dummy')
+
+### Additional Requirements
+
+For gaze tracking, additional dependencies are required:
+
+- OpenCV for computer vision processing
+- dlib for face and landmark detection
+- scipy for signal processing
+
+These are included in `requirements.txt`.
+
 ## Installation
 
 1. Clone this repository:
