@@ -100,17 +100,35 @@ Parameters:
 
 ### Graphical User Interface
 
-Run the GUI application for a more user-friendly experience:
+There are two GUI options available:
 
+1. **Mouse-only tracking GUI**:
 ```bash
 python mouse_tracker_gui.py
 ```
 
-The GUI provides:
-- Start/stop tracking controls
-- Real-time visualization of mouse movement
-- Live statistics
+2. **Synchronized mouse and gaze tracking GUI** (recommended):
+```bash
+python sync_tracker_gui.py
+```
+
+The synchronized tracking GUI provides:
+- Start/stop tracking controls for both mouse and gaze
+- Clean Session feature to reset data without restarting
+- Real-time visualization of mouse movement and gaze points
+- Live statistics on both mouse and gaze events
+- Distance analysis between gaze and mouse positions
 - Easy report generation
+
+### Clean Session Feature
+
+The synchronized tracking GUI includes a "Clean Session" button that allows you to:
+- Reset all tracking data without closing the application
+- Start a new tracking session with the same settings
+- Maintain your tracking mode between sessions
+- Run consecutive experiments easily
+
+This is particularly useful for researchers conducting multiple tests or when you want to discard practice data.
 
 ### Data Analysis
 
@@ -135,9 +153,12 @@ The application generates several file types:
 
 ## Project Structure
 
-- `mouse_tracker.py`: Core tracking functionality
+- `mouse_tracker.py`: Core mouse tracking functionality
+- `gaze_tracker.py`: Core gaze tracking functionality
+- `sync_tracker.py`: Synchronized mouse and gaze tracking
 - `mouse_analytics.py`: Data analysis and visualization
-- `mouse_tracker_gui.py`: Graphical user interface
+- `mouse_tracker_gui.py`: Basic graphical user interface
+- `sync_tracker_gui.py`: Advanced synchronized tracking interface
 - `requirements.txt`: Python dependencies
 
 ## Example Analysis

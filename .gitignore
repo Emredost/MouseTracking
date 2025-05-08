@@ -38,16 +38,30 @@ ENV/
 
 # Logging
 *.log
+*_log
+sync_tracker.log
+mouse_tracker.log
+gaze_tracker.log
+mouse_analytics.log
+mouse_tracker_gui.log
+sync_tracker_gui.log
+sync_tracker_runner.log
 
 # Data directories
 mouse_data/
+models/
 
 # Generated files
 *.csv
 *.json
 *.png
 *.html
+*.dat
+*.bz2
 
 # OS specific files
 .DS_Store
 Thumbs.db 
+
+# Model files (large)
+shape_predictor_68_face_landmarks.dat* 

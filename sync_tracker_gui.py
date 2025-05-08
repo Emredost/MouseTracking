@@ -367,6 +367,11 @@ class SyncTrackerGUI:
         
         ttk.Separator(control_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
         
+        self.clean_button = ttk.Button(control_frame, text="Clean Session", command=self.clean_session)
+        self.clean_button.pack(side=tk.LEFT, padx=5)
+        
+        ttk.Separator(control_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+        
         self.report_button = ttk.Button(control_frame, text="Generate Report", command=self.generate_report)
         self.report_button.pack(side=tk.LEFT, padx=5)
         
@@ -742,6 +747,59 @@ class SyncTrackerGUI:
         ttk.Label(frame, text="© 2023 ESTIA Gaze Project").pack()
         
         ttk.Button(frame, text="Close", command=about_window.destroy).pack(pady=10)
+
+    def clean_session(self):
+        """Clean the current session, resetting all data but maintaining the tracking mode"""
+        try:
+            # Ask for confirmation before cleaning
+            if not messagebox.askyesno("Clean Session", 
+                                      "This will reset all tracking data and start a fresh session.\n\nContinue?"):
+                return  # User canceled
+                
+            # Check if currently tracking
+            was_tracking = self.is_tracking
+            
+            # Stop tracking if needed
+            if was_tracking:
+                self.stop_tracking()
+            
+            # Save current mode and settings
+            current_mode = self.gaze_mode
+            current_dir = self.data_dir
+            
+            # Reinitialize the tracker
+            self.tracker = SyncTracker(output_dir=current_dir, gaze_mode=current_mode)
+            
+            # Clear visualization plots
+            self.trajectory_plot.clear()
+            self.distance_plot.clear()
+            
+            # Reset counters and stats
+            self.last_processed_event_idx = 0
+            self.duration_var.set("00:00:00")
+            self.mouse_events_var.set("0")
+            self.gaze_events_var.set("0")
+            self.avg_distance_var.set("0 px")
+            self.max_distance_var.set("0 px")
+            self.attention_var.set("0%")
+            
+            # Update UI status
+            self.status_var.set("Not Tracking")
+            self.status_label.config(foreground="black")
+            self.start_button.config(state=tk.NORMAL)
+            self.stop_button.config(state=tk.DISABLED)
+            
+            # Restart if it was tracking
+            if was_tracking:
+                self.start_tracking()
+            
+            # Log and notify user
+            logger.info("Session cleaned successfully")
+            messagebox.showinfo("Clean Session", "Session data has been cleared. You can continue with a fresh tracking session.")
+            
+        except Exception as e:
+            logger.error(f"Error cleaning session: {e}")
+            messagebox.showerror("Error", f"Failed to clean session: {e}")
 
 def main():
     """Run the synchronized tracker GUI application"""

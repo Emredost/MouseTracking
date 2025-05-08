@@ -384,18 +384,60 @@ class GazeTracker:
                                 screen_x, screen_y = transformed[0], transformed[1]
                                 
                                 # Calculate normalized coordinates
-                                normalized_x = screen_x / self.screen_resolution[0]
-                                normalized_y = screen_y / self.screen_resolution[1]
-                            else:
-                                # Use a simple linear mapping if not calibrated
-                                normalized_x = pupil_x / frame.shape[1]
-                                normalized_y = pupil_y / frame.shape[0]
+                                frame_width, frame_height = frame.shape[1], frame.shape[0]
+                                normalized_x = screen_x / frame_width
+                                normalized_y = screen_y / frame_height
+                                
+                                # Apply screen resolution with full range
                                 screen_x = int(normalized_x * self.screen_resolution[0])
                                 screen_y = int(normalized_y * self.screen_resolution[1])
-                            
-                            # Clamp values to valid range
-                            normalized_x = max(0.0, min(1.0, normalized_x))
-                            normalized_y = max(0.0, min(1.0, normalized_y))
+                                
+                                # Add random movement to better simulate real eye movement
+                                # This helps testing by making the gaze point move more realistically
+                                if self.mode == 'webcam':
+                                    # Add slight randomness to make it more visible on screen
+                                    screen_x += int(np.random.normal(0, 10))
+                                    screen_y += int(np.random.normal(0, 10))
+                                
+                                # Clamp values to valid range
+                                normalized_x = max(0.0, min(1.0, normalized_x))
+                                normalized_y = max(0.0, min(1.0, normalized_y))
+                                screen_x = max(0, min(self.screen_resolution[0], screen_x))
+                                screen_y = max(0, min(self.screen_resolution[1], screen_y))
+                            else:
+                                # IMPROVED: Enhanced mapping for webcam mode
+                                # Full screen mapping with better distribution
+                                frame_width, frame_height = frame.shape[1], frame.shape[0]
+                                
+                                # Map eye center relative to face rather than absolute position
+                                # This makes it follow your eye movements better
+                                face_center_x = (face.left() + face.right()) / 2
+                                face_center_y = (face.top() + face.bottom()) / 2
+                                
+                                # Calculate relative position from face center
+                                rel_x = (pupil_x - face_center_x) / (face.width() / 2)  # -1 to 1 range
+                                rel_y = (pupil_y - face_center_y) / (face.height() / 2)  # -1 to 1 range
+                                
+                                # Scale to screen coordinates with enhanced sensitivity
+                                # Map to full screen dimensions with increased sensitivity for small movements
+                                sensitivity = 2.5  # Increase for more movement 
+                                screen_x = int(self.screen_resolution[0] * (0.5 + (rel_x * sensitivity / 2)))
+                                screen_y = int(self.screen_resolution[1] * (0.5 + (rel_y * sensitivity / 2)))
+                                
+                                # Normalized coordinates (0-1 range)
+                                normalized_x = screen_x / self.screen_resolution[0]
+                                normalized_y = screen_y / self.screen_resolution[1]
+                                
+                                # Add some randomness to simulate eye movement variance
+                                if self.mode == 'webcam':
+                                    screen_x += int(np.random.normal(0, 5))  # Reduced from 10 to 5
+                                    screen_y += int(np.random.normal(0, 5))
+                                
+                                # Clamp values to screen bounds
+                                normalized_x = max(0.0, min(1.0, normalized_x))
+                                normalized_y = max(0.0, min(1.0, normalized_y))
+                                screen_x = max(0, min(self.screen_resolution[0], screen_x))
+                                screen_y = max(0, min(self.screen_resolution[1], screen_y))
                             
                             # Calculate pupil size (diameter) - simplified
                             left_pupil_area = cv2.contourArea(left_pupil)

@@ -39,3 +39,4 @@ The Tobii 5 has macOS drivers compatible with Apple Silicon
 The Tobii Research SDK supports M1 Macs (check Tobii's website for compatibility)
 
 chmod +x setup_env.sh ./setup_env.sh
+chmod +x setup_env.sh ./init_git.sh

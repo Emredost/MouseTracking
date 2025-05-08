@@ -16,7 +16,50 @@ The application has five main components:
 
 4. **Analytics Engine** (`mouse_analytics.py`): This is the "analyst" that processes all the recorded data and turns it into meaningful insights. It calculates statistics and creates visualizations to help you understand your mouse and gaze patterns.
 
-5. **User Interface** (`mouse_tracker_gui.py`): This is the "face" of the application - what you actually see and interact with. It provides buttons to start/stop tracking and shows real-time visualizations.
+5. **User Interface**: We provide two interface options:
+   - **Mouse-Only Interface** (`mouse_tracker_gui.py`): A simpler interface focused just on mouse tracking
+   - **Synchronized Interface** (`sync_tracker_gui.py`): The advanced interface that shows both mouse and gaze tracking together, with real-time visualization of their relationship
+
+## Running the Application
+
+You have multiple ways to run the application depending on your needs:
+
+1. **Basic Mouse Tracking**:
+   ```
+   python mouse_tracker.py
+   ```
+
+2. **Mouse Tracking with GUI**:
+   ```
+   python mouse_tracker_gui.py
+   ```
+
+3. **Synchronized Mouse and Gaze Tracking** (Command Line):
+   ```
+   python sync_tracker.py --gaze-mode [webcam|tobii|dummy]
+   ```
+
+4. **Synchronized Tracking with Interactive GUI** (Recommended):
+   ```
+   python sync_tracker_gui.py
+   ```
+
+With the synchronized GUI, you can:
+- Start and stop tracking sessions
+- Clean the session to start fresh without restarting the application
+- Switch between different gaze tracking modes
+- Generate comprehensive reports
+- See real-time visualizations of mouse movement, gaze tracking, and the relationship between them
+
+## Clean Session Feature
+
+The application now includes a "Clean Session" feature that allows you to:
+- Reset your tracking data without stopping the application
+- Start a new experiment immediately with the same settings
+- Maintain your preferred tracking mode and settings between sessions
+- Easily run multiple tracking sessions in sequence
+
+This is particularly useful for researchers conducting multiple experiments or when you want to discard practice runs and start with clean data.
 
 ## What It Actually Does
 
