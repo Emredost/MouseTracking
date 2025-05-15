@@ -1,6 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# ======================================================
+# Mouse Tracker GUI - User-friendly tracking interface
+# 
+# This program provides a graphical interface for:
+# - Real-time mouse movement tracking
+# - Visualizing trajectories and click patterns
+# - Monitoring session statistics
+# - Generating comprehensive reports
+# 
+# Perfect for usability testing and research with
+# an intuitive and accessible interface
+# ======================================================
+
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import matplotlib.pyplot as plt
@@ -21,7 +34,7 @@ from mouse_analytics import MouseAnalytics
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.FileHandler("mouse_tracker_gui.log"), logging.StreamHandler()]
+    handlers=[logging.FileHandler(os.path.join("logs", "mouse_tracker_gui.log")), logging.StreamHandler()]
 )
 logger = logging.getLogger("MouseTrackerGUI")
 
@@ -30,6 +43,8 @@ class RealTimeTrajectoryPlot:
     
     def __init__(self, master, figsize=(6, 4), dpi=100):
         """Initialize the real-time plot"""
+        # This class creates an interactive plot that updates in real time
+        # It shows the mouse movement path and click locations as they happen
         self.master = master
         
         # Create figure and axis
@@ -40,20 +55,24 @@ class RealTimeTrajectoryPlot:
         self.ax.grid(True, alpha=0.3)
         
         # Create canvas
+        # This embeds the matplotlib plot into the tkinter window
         self.canvas = FigureCanvasTkAgg(self.fig, master=master)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
         
         # Add toolbar
+        # This allows zooming, panning, and saving the plot
         self.toolbar = NavigationToolbar2Tk(self.canvas, master)
         self.toolbar.update()
         
         # Initialize line and points for plotting
+        # Different colors help distinguish between movement and different click types
         self.trajectory_line, = self.ax.plot([], [], '-', alpha=0.5, linewidth=1, color='blue')
         self.left_clicks = self.ax.scatter([], [], color='red', alpha=0.7, s=30, label='Left clicks')
         self.right_clicks = self.ax.scatter([], [], color='blue', alpha=0.7, s=30, label='Right clicks')
         self.middle_clicks = self.ax.scatter([], [], color='green', alpha=0.7, s=30, label='Middle clicks')
         
         # Data storage
+        # We keep track of all positions to display them in the plot
         self.x_data = []
         self.y_data = []
         self.left_click_x = []
@@ -67,6 +86,7 @@ class RealTimeTrajectoryPlot:
         self.ax.legend()
         
         # Invert y-axis to match screen coordinates
+        # Computer screens have (0,0) at the top-left
         self.ax.invert_yaxis()
         
         # Draw initial empty plot
@@ -77,6 +97,8 @@ class RealTimeTrajectoryPlot:
     
     def set_limits(self, x_range: Tuple[int, int] = None, y_range: Tuple[int, int] = None):
         """Set the axis limits"""
+        # This automatically detects the screen size to set appropriate plot boundaries
+        # It ensures the visualization matches the actual screen dimensions
         if x_range is None:
             # Get screen width if possible, otherwise use a default
             try:
@@ -99,6 +121,9 @@ class RealTimeTrajectoryPlot:
     
     def update_plot(self, events: List[Dict]) -> None:
         """Update the plot with new events"""
+        # This handles all the new mouse events and updates the visualization
+        # It processes both movements and different types of clicks
+        
         # Process events
         for event in events:
             if event['event_type'] == 'move':
@@ -117,12 +142,14 @@ class RealTimeTrajectoryPlot:
                     self.middle_click_y.append(event['y'])
         
         # Limit data points to prevent slowdown
+        # This ensures the visualization stays responsive even over long sessions
         max_points = 1000
         if len(self.x_data) > max_points:
             self.x_data = self.x_data[-max_points:]
             self.y_data = self.y_data[-max_points:]
         
         # Update plots
+        # This refreshes all visual elements with the new data
         self.trajectory_line.set_data(self.x_data, self.y_data)
         self.left_clicks.set_offsets(np.column_stack([self.left_click_x, self.left_click_y]) if self.left_click_x else np.empty((0, 2)))
         self.right_clicks.set_offsets(np.column_stack([self.right_click_x, self.right_click_y]) if self.right_click_x else np.empty((0, 2)))
@@ -133,6 +160,8 @@ class RealTimeTrajectoryPlot:
     
     def clear(self) -> None:
         """Clear the plot"""
+        # Reset all data and visual elements
+        # This is used when starting a new tracking session
         self.x_data = []
         self.y_data = []
         self.left_click_x = []
@@ -154,16 +183,20 @@ class MouseTrackerGUI:
     
     def __init__(self, root):
         """Initialize the GUI"""
+        # This is the main application window that contains all controls
+        # and visualization components for mouse tracking
         self.root = root
         root.title("Advanced Mouse Tracker")
         root.geometry("1200x800")
         
         # Set up the tracker
+        # This creates the data directory and initializes the tracking engine
         self.data_dir = os.path.join(os.getcwd(), "mouse_data")
         os.makedirs(self.data_dir, exist_ok=True)
         self.tracker = MouseTracker(output_dir=self.data_dir)
         
         # Tracking state
+        # These variables keep track of the current session status
         self.is_tracking = False
         self.update_interval = 500  # ms
         self.last_processed_event_idx = 0
@@ -175,15 +208,19 @@ class MouseTrackerGUI:
         self.create_layout()
         
         # Start the UI update loop
+        # This periodically refreshes the statistics and visualization
         self.update_stats()
         
         logger.info("MouseTrackerGUI initialized")
     
     def create_menu(self):
         """Create the application menu"""
+        # This sets up the top menu bar with various commands
+        # grouped into logical categories
         menubar = tk.Menu(self.root)
         
         # File menu
+        # Contains main tracking operations and program control
         file_menu = tk.Menu(menubar, tearoff=0)
         file_menu.add_command(label="Start Tracking", command=self.start_tracking)
         file_menu.add_command(label="Stop Tracking", command=self.stop_tracking)
@@ -194,11 +231,13 @@ class MouseTrackerGUI:
         menubar.add_cascade(label="File", menu=file_menu)
         
         # Options menu
+        # Contains configuration settings
         options_menu = tk.Menu(menubar, tearoff=0)
         options_menu.add_command(label="Settings", command=self.show_settings)
         menubar.add_cascade(label="Options", menu=options_menu)
         
         # Help menu
+        # Contains information about the program
         help_menu = tk.Menu(menubar, tearoff=0)
         help_menu.add_command(label="About", command=self.show_about)
         menubar.add_cascade(label="Help", menu=help_menu)
@@ -207,6 +246,8 @@ class MouseTrackerGUI:
     
     def create_layout(self):
         """Create the main application layout"""
+        # This establishes the visual structure of the application
+        # with control panels, statistics, and visualization areas
         # Create main frame
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.pack(fill=tk.BOTH, expand=True)
@@ -292,6 +333,8 @@ class MouseTrackerGUI:
     
     def start_tracking(self):
         """Start mouse tracking"""
+        # This begins the tracking session, capturing all mouse events
+        # and updating the visualization in real-time
         if self.is_tracking:
             logger.warning("Tracking already started")
             return
@@ -322,6 +365,8 @@ class MouseTrackerGUI:
     
     def stop_tracking(self):
         """Stop mouse tracking"""
+        # This ends the tracking session and saves all collected data
+        # It also prompts the user to generate a report if desired
         if not self.is_tracking:
             logger.warning("Tracking not started")
             return
@@ -350,6 +395,8 @@ class MouseTrackerGUI:
     
     def update_stats(self):
         """Update statistics and visualizations"""
+        # This periodically refreshes all displayed information
+        # including duration, events, distance, speed, and position
         if self.is_tracking:
             # Calculate duration
             duration_secs = time.time() - self.tracker.start_time
@@ -401,6 +448,8 @@ class MouseTrackerGUI:
     
     def generate_report(self):
         """Generate analytics report"""
+        # This creates a comprehensive analysis of the tracking session
+        # including visualizations and statistics in an HTML format
         try:
             # Create analytics object
             analytics = MouseAnalytics(data_dir=self.data_dir)
@@ -422,6 +471,8 @@ class MouseTrackerGUI:
     
     def show_settings(self):
         """Show settings dialog"""
+        # This displays a dialog for configuring the application
+        # allowing adjustment of data directory and update interval
         settings_window = tk.Toplevel(self.root)
         settings_window.title("Settings")
         settings_window.geometry("400x300")
@@ -481,6 +532,8 @@ class MouseTrackerGUI:
     
     def show_about(self):
         """Show about dialog"""
+        # This displays information about the application
+        # including version, features, and attribution
         about_window = tk.Toplevel(self.root)
         about_window.title("About Mouse Tracker")
         about_window.geometry("400x300")
@@ -508,6 +561,8 @@ class MouseTrackerGUI:
 
 def main():
     """Run the mouse tracker GUI application"""
+    # This is the entry point when running the application directly
+    # It creates the main window and starts the GUI event loop
     root = tk.Tk()
     app = MouseTrackerGUI(root)
     root.mainloop()

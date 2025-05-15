@@ -1,6 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# ======================================================
+# Gaze Tracker - Eye movement tracking system
+# 
+# This program records all eye gaze activities including:
+# - Eye fixations
+# - Saccades (rapid eye movements)
+# - Blinks
+# 
+# Data is automatically saved and can be visualized
+# as heatmaps to show gaze patterns
+# ======================================================
+
 import time
 import datetime
 import os
@@ -8,68 +20,77 @@ import threading
 import logging
 import numpy as np
 import cv2
-import dlib
+import dlib # For face detection and landmark prediction
 import json
 import csv
 from dataclasses import dataclass, asdict
 from typing import Dict, List, Tuple, Any, Optional, Union
 
-# Get environment variables
+# ====== CONFIGURATION ======
+# Default settings that can be overridden by environment variables
+# This can be changed by setting the MOUSE_TRACKER_DATA_DIR environment variable
 DEFAULT_DATA_DIR = os.environ.get('MOUSE_TRACKER_DATA_DIR', os.path.join(os.getcwd(), "mouse_data"))
 DEBUG_MODE = os.environ.get('MOUSE_TRACKER_DEBUG', 'false').lower() == 'true'
 GAZE_TRACKER_MODE = os.environ.get('GAZE_TRACKER_MODE', 'webcam').lower()  # 'webcam', 'tobii', or 'dummy'
 
-# Set up logging
+# Setting up logging to track what's happening in the program
 log_level = logging.DEBUG if DEBUG_MODE else logging.INFO
 logging.basicConfig(
     level=log_level,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.FileHandler("gaze_tracker.log"), logging.StreamHandler()]
+    handlers=[logging.FileHandler(os.path.join("logs", "gaze_tracker.log")), logging.StreamHandler()]
 )
 logger = logging.getLogger("GazeTracker")
 
 @dataclass
 class GazeEvent:
-    """Data class for storing gaze events"""
-    timestamp: float
-    event_type: str  # 'fixation', 'saccade', 'blink'
-    x: float = 0.0  # Normalized x coordinate (0-1)
-    y: float = 0.0  # Normalized y coordinate (0-1)
-    duration: Optional[float] = None  # Duration in seconds (for fixations)
-    pupil_size: Optional[float] = None  # Pupil diameter in mm
-    confidence: float = 1.0  # Confidence value (0-1)
-    screen_x: Optional[int] = None  # Actual screen x coordinate
-    screen_y: Optional[int] = None  # Actual screen y coordinate
+    """
+    Data structure for storing gaze events
+    Each event captures what the eye did at a specific moment in time
+    """
+    timestamp: float         # When the event happened (seconds since epoch)
+    event_type: str          # What kind of event: 'fixation', 'saccade', or 'blink'
+    x: float = 0.0           # X-coordinate on screen (normalized 0-1)
+    y: float = 0.0           # Y-coordinate on screen (normalized 0-1)
+    duration: Optional[float] = None  # How long the fixation lasted (seconds)
+    pupil_size: Optional[float] = None  # Size of the pupil (millimeters)
+    confidence: float = 1.0  # How reliable the measurement is (0-1)
+    screen_x: Optional[int] = None  # Actual pixel X-coordinate on screen
+    screen_y: Optional[int] = None  # Actual pixel Y-coordinate on screen
 
 class GazeTracker:
-    """Advanced gaze tracking class that can work with different eye tracking backends"""
+    """
+    The main tracking system that records and analyzes eye movements
+    """
     
     def __init__(self, output_dir: str = DEFAULT_DATA_DIR, 
                  mode: str = GAZE_TRACKER_MODE,
                  screen_resolution: Tuple[int, int] = None):
-        """Initialize the gaze tracker
-
-        Args:
-            output_dir: Directory to save gaze data
-            mode: Tracking mode ('webcam', 'tobii', 'dummy')
-            screen_resolution: Monitor resolution (width, height)
         """
-        self.events: List[GazeEvent] = []
-        self.running = False
-        self.output_dir = output_dir
-        self.mode = mode
-        self.tracker = None
-        self.lock = threading.Lock()
-        self.calibrated = False
+        Initialize the tracker with basic settings
         
-        # Get screen resolution
+        Args:
+            output_dir: Where to save the collected data
+            mode: Which tracking method to use ('webcam', 'tobii', or 'dummy')
+            screen_resolution: The size of the screen in pixels (width, height)
+        """
+        # Storage for all gaze events
+        self.events: List[GazeEvent] = [] # List to store gaze events
+        self.running = False # Flag to control the tracking loop so we can stop it gracefully
+        self.output_dir = output_dir # Directory to save data
+        self.mode = mode # Tracking mode: 'webcam', 'tobii', or 'dummy'
+        self.tracker = None 
+        self.lock = threading.Lock()  # Prevents data corruption when multiple threads access data
+        self.calibrated = False # Flag to check if the tracker is calibrated
+        
+        # Get screen resolution for gaze mapping 
         if screen_resolution is None:
             try:
                 import tkinter as tk
                 root = tk.Tk()
-                screen_width = root.winfo_screenwidth()
-                screen_height = root.winfo_screenheight()
-                root.destroy()
+                screen_width = root.winfo_screenwidth() # Width in pixels
+                screen_height = root.winfo_screenheight() # Height in pixels
+                root.destroy() # Close the Tkinter window and set resolution
                 self.screen_resolution = (screen_width, screen_height)
             except:
                 # Default resolution if we can't detect
@@ -78,10 +99,10 @@ class GazeTracker:
         else:
             self.screen_resolution = screen_resolution
         
-        # Ensure output directory exists
+        # Making sure we have a place to save our data
         os.makedirs(output_dir, exist_ok=True)
         
-        # Initialize tracker based on mode
+        # Initializing tracker based on mode
         if self.mode == 'webcam':
             self._init_webcam_tracker()
         elif self.mode == 'tobii':
@@ -89,24 +110,31 @@ class GazeTracker:
         else:  # 'dummy' or fallback
             self._init_dummy_tracker()
             
-        # Tracking metrics
-        self.total_fixation_duration = 0.0
-        self.fixation_count = 0
-        self.saccade_count = 0
-        self.blink_count = 0
-        self.start_time = 0
+        # Tracking statistics
+        self.total_fixation_duration = 0.0  # Total time spent on fixations
+        self.fixation_count = 0             # Number of fixation events
+        self.saccade_count = 0              # Number of saccade events
+        self.blink_count = 0                # Number of blink events
+        self.start_time = 0                 # When tracking began
         
         logger.info(f"GazeTracker initialized in {self.mode} mode")
         logger.debug(f"Using output directory: {self.output_dir}")
         logger.debug(f"Screen resolution: {self.screen_resolution}")
     
     def _init_webcam_tracker(self):
-        """Initialize webcam-based gaze tracker using computer vision"""
+        """
+        Initialize webcam-based gaze tracker using computer vision
+        
+        This uses the webcam to detect the user's face and eyes,
+        then calculates where they are looking on the screen
+        """
         try:
             # Check if we have necessary libraries and models
             self.detector = dlib.get_frontal_face_detector()
             
-            # Path to face landmark predictor model
+            # Path to face landmark predictor model that i found useful
+            # This is a pre-trained model for facial landmark detection
+            # You can download it from http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2
             model_path = os.path.join(os.path.dirname(__file__), "models", "shape_predictor_68_face_landmarks.dat")
             
             # If model doesn't exist, prompt user to download it
@@ -131,17 +159,17 @@ class GazeTracker:
                 return
             
             # Set up thread for processing webcam frames
-            self.frame_ready = threading.Event()
-            self.current_frame = None
-            self.stop_requested = False
+            self.frame_ready = threading.Event() # Event to signal when a frame is ready
+            self.current_frame = None # Current frame for calibration
+            self.stop_requested = False # Flag to stop the thread 
             
             # Calibration data
-            self.calibration_data = []
-            self.calibration_points = []
+            self.calibration_data = [] # List to store calibration points
+            self.calibration_points = [] # List to store calibration points
             self.calibration_matrix = np.eye(3)  # Identity matrix as default
             
             # Eye appearance model
-            self.eye_left = None
+            self.eye_left = None # Left eye appearance model so we can track it 
             self.eye_right = None
             
             logger.info("Webcam-based gaze tracker initialized")
@@ -152,13 +180,18 @@ class GazeTracker:
             self._init_dummy_tracker()
     
     def _init_tobii_tracker(self):
-        """Initialize Tobii eye tracker"""
+        """
+        Initialize Tobii eye tracker hardware
+        
+        This connects to a Tobii eye tracker device if available
+        and sets up the data collection process
+        """
         try:
             # Attempt to import tobii_research
-            import tobii_research as tr
+            import tobii_research as tr # This is the Tobii Research SDK for Python 
             
             # Find connected eye trackers
-            eye_trackers = tr.find_all_eyetrackers()
+            eye_trackers = tr.find_all_eyetrackers() # List of all connected eye trackers
             
             if len(eye_trackers) == 0:
                 logger.error("No Tobii eye trackers found. Falling back to dummy mode.")
@@ -168,15 +201,15 @@ class GazeTracker:
             
             # Use the first available tracker
             self.tracker = eye_trackers[0]
+            # Set the screen resolution based on the tracker 
             logger.info(f"Connected to Tobii eye tracker: {self.tracker.model} (S/N: {self.tracker.serial_number})")
-            
             # Create callback for gaze data
             def gaze_data_callback(gaze_data):
                 # Process and store gaze data
                 if gaze_data['left_gaze_point_validity'] or gaze_data['right_gaze_point_validity']:
                     # Use the valid eye, or average if both are valid
-                    x, y = 0.0, 0.0
-                    valid_eyes = 0
+                    x, y = 0.0, 0.0 # Normalized coordinates (0-1)
+                    valid_eyes = 0 # Count valid eyes
                     
                     if gaze_data['left_gaze_point_validity']:
                         x += gaze_data['left_gaze_point_on_display_area'][0]
@@ -247,7 +280,12 @@ class GazeTracker:
             self._init_dummy_tracker()
     
     def _init_dummy_tracker(self):
-        """Initialize a dummy tracker that simulates gaze data"""
+        """
+        Initialize a dummy tracker that simulates gaze data
+        
+        This is used when no real eye tracking is available,
+        creating realistic synthetic data for testing
+        """
         self.mode = 'dummy'
         # There's no actual initialization needed for the dummy mode,
         # as it will just generate synthetic data
@@ -255,9 +293,14 @@ class GazeTracker:
         self.calibrated = True  # Dummy tracker is always "calibrated"
     
     def _process_webcam_frames(self):
-        """Process webcam frames to track gaze in a separate thread"""
+        """
+        Process webcam frames to track gaze in a separate thread
+        
+        This analyzes each video frame to detect eyes and estimate gaze direction
+        """
         last_blink_time = 0
-        minimum_blink_interval = 1.0  # Minimum time between blinks in seconds
+        minimum_blink_interval = 1.0  # Minimum time between blinks in seconds 
+        # so that we won't count multiple blinks to avoid counting multiple blinks in quick succession 
         
         while not self.stop_requested:
             if not self.cap.isOpened():
@@ -468,7 +511,12 @@ class GazeTracker:
             time.sleep(0.01)
     
     def _generate_dummy_data(self):
-        """Generate synthetic gaze data for the dummy tracker"""
+        """
+        Generate synthetic gaze data for the dummy tracker
+        
+        This creates realistic eye movement patterns including fixations,
+        saccades and blinks without requiring actual eye tracking hardware
+        """
         # Parameters for the random walk
         step_size = 0.01
         fixation_duration = 0.5  # seconds
@@ -561,7 +609,11 @@ class GazeTracker:
             time.sleep(1/60)  # ~60Hz sampling rate
     
     def calibrate(self, calibration_points: List[Tuple[float, float]] = None):
-        """Calibrate the gaze tracker
+        """
+        Calibrate the gaze tracker
+        
+        This aligns the raw eye tracking data with actual screen positions
+        to ensure accurate gaze point detection
         
         Args:
             calibration_points: List of screen positions to use for calibration (normalized 0-1)
@@ -680,7 +732,11 @@ class GazeTracker:
             return True
     
     def start(self) -> bool:
-        """Start tracking gaze events
+        """
+        Begin tracking gaze events
+        
+        This initializes the appropriate tracking method and begins 
+        collecting eye movement data
         
         Returns:
             bool: True if tracking started successfully, False otherwise
@@ -724,7 +780,9 @@ class GazeTracker:
         return True
     
     def stop(self) -> None:
-        """Stop tracking gaze events"""
+        """
+        Stop tracking gaze events and save all collected data
+        """
         if not self.running:
             logger.warning("Gaze tracking not started")
             return
@@ -755,7 +813,12 @@ class GazeTracker:
         self.save_data()
     
     def save_data(self) -> None:
-        """Save gaze tracking data to files"""
+        """
+        Save gaze tracking data to files
+        
+        This exports all collected eye tracking data to CSV and JSON formats
+        for later analysis
+        """
         if not self.events:
             logger.warning("No gaze events to save")
             return
@@ -791,7 +854,11 @@ class GazeTracker:
         logger.info(f"Total blinks: {self.blink_count}")
 
 def main():
-    """Main function to run the gaze tracker standalone"""
+    """
+    Entry point when running this script directly
+    Parses command line arguments and manages the tracking process so
+    it can be run from the command line with different options
+    """
     import argparse
     
     parser = argparse.ArgumentParser(description='Advanced Gaze Tracker')
@@ -816,18 +883,22 @@ def main():
         logger.info(f"Gaze tracking started. Press Ctrl+C to stop.")
         
         if args.duration > 0:
+            # Run for the specified duration
             time.sleep(args.duration)
             tracker.stop()
         else:
-            # Run indefinitely until interrupted
+            # Run indefinitely until manually stopped so the user can stop it with Ctrl+C
             while tracker.running:
                 time.sleep(1)
     
     except KeyboardInterrupt:
+        # Handle when user presses Ctrl+C
         logger.info("Keyboard interrupt received")
     finally:
+        # Always make sure to stop tracking and save data
         tracker.stop()
         logger.info("Gaze tracking completed")
 
+# This section will run when the script is executed directly (not imported)
 if __name__ == "__main__":
     main() 

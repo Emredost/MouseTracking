@@ -1,20 +1,20 @@
-# Mouse Tracking Application: A Simple Explanation
+# Mouse Tracking Application:
 
 ## What We've Built
 
-We've created a sophisticated tracking application that records, analyzes, and visualizes how you use your mouse and where you look on screen. Think of it like a fitness tracker, but for your mouse movements and eye gaze instead of your steps!
+We've created a sophisticated tracking application that records, analyzes, and visualizes how you use your mouse and where you look on screen.
 
-## How It Works (The Simple Version)
+## How It Works
 
 The application has five main components:
 
-1. **Core Mouse Tracker** (`mouse_tracker.py`): This is the "brain" that captures every move, click, and scroll your mouse makes. It works silently in the background, recording data about where your mouse goes and what it does.
+1. **Core Mouse Tracker** (`mouse_tracker.py`): This is the module that captures every move, click, and scroll your mouse makes. It works silently in the background, recording data about where your mouse goes and what it does.
 
-2. **Gaze Tracker** (`gaze_tracker.py`): This is the "eye" that tracks where you're looking on your screen. It can use your webcam, a specialized Tobii eye tracker, or generate simulated data for testing.
+2. **Gaze Tracker** (`gaze_tracker.py`): This is the module that tracks where you're looking on your screen. It can use your webcam, a specialized Tobii eye tracker, or generate synthetic data for testing.
 
-3. **Synchronization System** (`sync_tracker.py`): This is the "coordinator" that connects mouse and gaze data, allowing you to see the relationship between where you look and where you click.
+3. **Synchronization System** (`sync_tracker.py`): This is the module that connects mouse and gaze data, allowing you to see the relationship between where you look and where you click.
 
-4. **Analytics Engine** (`mouse_analytics.py`): This is the "analyst" that processes all the recorded data and turns it into meaningful insights. It calculates statistics and creates visualizations to help you understand your mouse and gaze patterns.
+4. **Analytics Engine** (`mouse_analytics.py`): This is the module that processes all the recorded data and turns it into meaningful insights. It calculates statistics and creates visualizations to help you understand your mouse and gaze patterns.
 
 5. **User Interface**: We provide two interface options:
    - **Mouse-Only Interface** (`mouse_tracker_gui.py`): A simpler interface focused just on mouse tracking
@@ -59,7 +59,7 @@ The application now includes a "Clean Session" feature that allows you to:
 - Maintain your preferred tracking mode and settings between sessions
 - Easily run multiple tracking sessions in sequence
 
-This is particularly useful for researchers conducting multiple experiments or when you want to discard practice runs and start with clean data.
+This is particularly may be useful for researching purposes and conducting multiple experiments or when you want to discard practice runs and start with clean data.
 
 ## What It Actually Does
 
@@ -98,7 +98,7 @@ The application offers three methods of tracking where you look:
    - Mimics typical eye movement patterns (fixations, saccades, blinks)
    - Allows you to test the software without tracking hardware
 
-## Visual Insights You'll Get
+## Visual Insights We'll Get
 
 The synchronized tracking generates powerful visualizations:
 
@@ -119,7 +119,7 @@ The application is designed with data privacy and flexibility in mind:
 
 ## Technical Insights
 
-### Programming Concepts You Can Learn From This Code
+### Programming Concepts used in This Code
 
 1. **Object-Oriented Programming**: The application uses classes to organize code logically
 
@@ -161,8 +161,6 @@ Combined mouse and gaze tracking can be useful for:
 
 To take this project further, you could:
 
-1. Add machine learning to identify patterns in the relationship between gaze and mouse movement
-2. Create a real-time feedback system for improving coordination between eyes and mouse
-3. Integrate with specific applications to provide task-specific analysis
-4. Extend to support other input devices like touchscreens and styluses
-5. Develop interfaces for people with motor disabilities that respond to gaze 
+1. Integrate with specific applications to provide task-specific analysis
+2. Extend to support other input devices like touchscreens and styluses
+3. Develop interfaces for people with motor disabilities that respond to gaze 

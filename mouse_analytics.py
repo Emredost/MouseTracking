@@ -1,6 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# ======================================================
+# Mouse Analytics - Advanced mouse data analysis toolkit
+# 
+# This program analyzes mouse tracking data to provide:
+# - Visual representations (heatmaps, trajectories)
+# - Usage statistics (speed, distance, clicks)
+# - Comprehensive HTML reports with visualizations
+# 
+# The analytics can reveal user behavior patterns
+# and interaction hotspots on the screen
+# ======================================================
+
 import os
 import json
 import glob
@@ -16,7 +28,7 @@ from datetime import datetime
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.FileHandler("mouse_analytics.log"), logging.StreamHandler()]
+    handlers=[logging.FileHandler(os.path.join("logs", "mouse_analytics.log")), logging.StreamHandler()]
 )
 logger = logging.getLogger("MouseAnalytics")
 
@@ -34,6 +46,8 @@ class MouseAnalytics:
     
     def load_data(self, file_pattern: str = "*.json") -> None:
         """Load data from JSON files in the data directory"""
+        # Find all matching files in the data directory
+        # This lets us analyze multiple tracking sessions at once
         all_files = glob.glob(os.path.join(self.data_dir, file_pattern))
         
         if not all_files:
@@ -42,6 +56,8 @@ class MouseAnalytics:
         
         all_events = []
         
+        # Process each file and combine the data
+        # This allows us to analyze multiple sessions together
         for file_path in all_files:
             try:
                 with open(file_path, 'r') as f:
@@ -56,12 +72,15 @@ class MouseAnalytics:
             return
         
         # Convert to pandas DataFrame for easier analysis
+        # Pandas lets us manipulate and analyze the data more efficiently
         self.data = pd.DataFrame(all_events)
         
         # Convert timestamp to datetime for easier analysis
+        # This helps when generating time-based visualizations
         self.data['datetime'] = pd.to_datetime(self.data['timestamp'], unit='s')
         
-        # Split by event type
+        # Split by event type for specialized analysis
+        # This gives us separate datasets for different types of mouse behavior
         self.move_data = self.data[self.data['event_type'] == 'move']
         self.click_data = self.data[self.data['event_type'] == 'click']
         self.scroll_data = self.data[self.data['event_type'] == 'scroll']
@@ -73,13 +92,16 @@ class MouseAnalytics:
     
     def calculate_metrics(self) -> Dict[str, Any]:
         """Calculate key metrics from the tracking data"""
+        # This function extracts meaningful statistics from the raw data
+        # These metrics help understand user behavior patterns
         if self.data is None or len(self.data) == 0:
             logger.error("No data loaded to calculate metrics")
             return {}
         
         metrics = {}
         
-        # Time metrics
+        # Time metrics - How long was the tracking session?
+        # This helps understand the duration of user interaction
         if len(self.data) > 0:
             start_time = self.data['timestamp'].min()
             end_time = self.data['timestamp'].max()
@@ -89,7 +111,8 @@ class MouseAnalytics:
             metrics['start_time'] = datetime.fromtimestamp(start_time).strftime('%Y-%m-%d %H:%M:%S')
             metrics['end_time'] = datetime.fromtimestamp(end_time).strftime('%Y-%m-%d %H:%M:%S')
         
-        # Movement metrics
+        # Movement metrics - How did the mouse move?
+        # These metrics reveal the intensity and pattern of mouse usage
         if len(self.move_data) > 1:
             # Calculate distances between consecutive points
             x_diff = self.move_data['x'].diff().dropna()
@@ -103,6 +126,7 @@ class MouseAnalytics:
             metrics['max_distance_single_movement'] = distances.max()
             
             # Calculate speeds (pixels per second)
+            # This shows how quickly the user moves their mouse
             time_diffs = self.move_data['timestamp'].diff().dropna()
             speeds = distances / np.maximum(time_diffs, 1e-6)  # Avoid division by zero
             
@@ -114,7 +138,8 @@ class MouseAnalytics:
             metrics['x_range'] = (self.move_data['x'].min(), self.move_data['x'].max())
             metrics['y_range'] = (self.move_data['y'].min(), self.move_data['y'].max())
         
-        # Click metrics
+        # Click metrics - How did the user click?
+        # These metrics show interaction patterns with mouse buttons
         if len(self.click_data) > 0:
             # Count clicks by type and state
             press_data = self.click_data[self.click_data['pressed'] == True]
@@ -125,6 +150,7 @@ class MouseAnalytics:
             metrics['button_counts'] = button_counts
             
             # Calculate time between clicks
+            # This reveals the rhythm of user interaction
             if len(press_data) > 1:
                 click_times = press_data.sort_values('timestamp')
                 time_between_clicks = click_times['timestamp'].diff().dropna()
@@ -132,7 +158,8 @@ class MouseAnalytics:
                 metrics['avg_time_between_clicks'] = time_between_clicks.mean()
                 metrics['median_time_between_clicks'] = time_between_clicks.median()
         
-        # Scroll metrics
+        # Scroll metrics - How did the user scroll?
+        # These metrics reveal screen navigation patterns
         if len(self.scroll_data) > 0:
             metrics['total_scrolls'] = len(self.scroll_data)
             metrics['avg_scroll_dx'] = self.scroll_data['dx'].mean()
@@ -143,6 +170,8 @@ class MouseAnalytics:
     
     def generate_trajectory_plot(self, output_file: str = None) -> None:
         """Generate a trajectory plot of mouse movements"""
+        # This visualization shows the path the mouse took across the screen
+        # It helps visualize the flow of user attention and interaction
         if self.move_data is None or len(self.move_data) == 0:
             logger.error("No movement data to generate trajectory plot")
             return
@@ -150,6 +179,7 @@ class MouseAnalytics:
         plt.figure(figsize=(12, 8))
         
         # Get a sample of the data if there are too many points
+        # This improves performance while maintaining visual quality
         if len(self.move_data) > 10000:
             move_sample = self.move_data.sample(10000)
             logger.info(f"Sampled 10000 points from {len(self.move_data)} for trajectory plot")
@@ -160,6 +190,7 @@ class MouseAnalytics:
         plt.plot(move_sample['x'], move_sample['y'], '-', alpha=0.5, linewidth=1)
         
         # Add click points if available
+        # This shows where the user interacted with content
         if self.click_data is not None and len(self.click_data) > 0:
             click_press = self.click_data[self.click_data['pressed'] == True]
             
@@ -197,6 +228,8 @@ class MouseAnalytics:
     
     def generate_heatmap(self, grid_size: int = 50, output_file: str = None) -> None:
         """Generate a heatmap of mouse positions"""
+        # This visualization shows where the mouse spent most of its time
+        # Hotspots indicate areas of user attention and interaction
         if self.move_data is None or len(self.move_data) == 0:
             logger.error("No movement data to generate heatmap")
             return
@@ -242,6 +275,8 @@ class MouseAnalytics:
     
     def generate_speed_plot(self, output_file: str = None) -> None:
         """Generate a plot of mouse movement speed over time"""
+        # This visualization shows how the mouse speed changed during use
+        # It can reveal periods of quick movement vs. careful positioning
         if self.move_data is None or len(self.move_data) < 2:
             logger.error("Insufficient movement data to generate speed plot")
             return
@@ -300,6 +335,8 @@ class MouseAnalytics:
     
     def generate_click_distribution(self, output_file: str = None) -> None:
         """Generate a plot showing the distribution of mouse clicks"""
+        # This visualization shows which mouse buttons were used the most
+        # It helps understand user interaction preferences
         if self.click_data is None or len(self.click_data) == 0:
             logger.error("No click data to generate distribution")
             return
@@ -339,6 +376,8 @@ class MouseAnalytics:
     
     def generate_report(self, output_file: str = None) -> None:
         """Generate a comprehensive HTML report of mouse activity"""
+        # This creates a complete analysis report with all visualizations and metrics
+        # Perfect for sharing results or documenting user behavior patterns
         if self.data is None or len(self.data) == 0:
             logger.error("No data to generate report")
             return
@@ -498,6 +537,8 @@ class MouseAnalytics:
 
 def main():
     """Main function to run analytics"""
+    # This allows the tool to be run directly from the command line
+    # It processes command-line arguments and runs the appropriate analysis
     import argparse
     
     parser = argparse.ArgumentParser(description='Mouse Tracking Analytics')

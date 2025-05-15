@@ -1,13 +1,13 @@
 # Integrated Mouse and Gaze Tracking System
 
-This document explains the advanced gaze tracking component that has been integrated with the mouse tracking system. The integration allows for synchronous tracking of both mouse movements and eye gaze, providing valuable insights into the relationship between visual attention and mouse control.
+This document explains the gaze tracking component that has been integrated with the mouse tracking system. The integration allows for synchronous tracking of both mouse movements and eye gaze, providing  insights into the relationship between visual attention and mouse control.
 
-## Gaze Tracking Technologies
+## Gaze Tracking
 
 The system supports three different methods for gaze tracking:
 
-1. **Webcam-based tracking** - Uses computer vision techniques to detect eye movements from a standard webcam
-2. **Tobii eye tracker** - Supports professional-grade eye tracking hardware for maximum precision
+1. **Webcam-based tracking** - Uses computer vision techniques to detect eye movements from a standard webcam needs a lot of calibration at this stage and we are not even sure if it will work in a real scenario but if it does we can create a simple app to collect data from the user**
+2. **Tobii eye tracker** - Supports eye tracking hardware for maximum precision
 3. **Dummy tracking** - Simulates gaze data for testing and development purposes
 
 ## How Gaze Tracking Works
@@ -33,7 +33,7 @@ The system tracks three types of gaze events:
 
 ## Data Synchronization
 
-The `SyncTracker` module is the heart of the integrated system, performing several key functions:
+The `SyncTracker` module is the main module of the integrated system, performing several key functions:
 
 1. **Event correlation** - It matches up temporally close mouse and gaze events
 2. **Position alignment** - It associates mouse positions with gaze positions occurring at approximately the same time
@@ -100,7 +100,7 @@ To use the integrated tracking system:
 
 3. Run the synchronous tracker:
    ```bash
-   python sync_tracker.py --gaze-mode webcam --report
+   python sync_tracker.py
    ```
 
 4. When finished, press Ctrl+C to stop tracking and generate a report. 

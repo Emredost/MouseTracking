@@ -176,9 +176,31 @@ After tracking your mouse movements, you can generate reports that include:
 - Python 3.7 or higher
 - Dependencies listed in requirements.txt
 
+## Documentation
+
+This project includes comprehensive documentation:
+
+- `README.md`: General overview and usage instructions
+- `API_DOCUMENTATION.md`: Detailed API documentation for developers
+- `API_QUICK_REFERENCE.md`: Concise reference for common API usage patterns
+- `EXTENSION_GUIDE.md`: Guide for extending the system with new tracking methods
+
+**Note for Developers**: The API documentation is provided for developers who have been granted explicit permission to extend the system. Please see the license section below for details.
+
 ## License
 
-This project is released under the MIT License.
+This project is released under a Research and Academic License. Copyright (c) 2025 Emre Dost.
+
+This software was developed for UX research, usability testing, cognitive load assessment, accessibility research, and human-computer interaction (HCI) studies at ESTIA University of Technology, France.
+
+**Usage Permission**: Permission to use the Software for academic and research purposes may be granted upon request. To request permission, please contact Emre Dost at emredost1987@gmail.com.
+
+For academic and research use, the following conditions apply:
+1. The Software may be used for non-commercial research and educational purposes only.
+2. You must acknowledge the original author (Emre Dost) and ESTIA University of Technology in any publications or presentations that result from the use of this Software.
+3. Redistributions of the Software must retain the license notice and acknowledgment.
+
+For any commercial use, explicit written permission is required from the copyright holder.
 
 ## GitHub Repository Setup
 

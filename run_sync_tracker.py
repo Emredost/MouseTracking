@@ -12,6 +12,21 @@ Usage:
     python run_sync_tracker.py [--gaze-mode {webcam|tobii|dummy}]
 """
 
+# ======================================================
+# Sync Tracker Runner - Automatic setup and launcher
+# 
+# This program handles all the setup required to run 
+# the synchronized tracking system:
+# - Checking and installing dependencies
+# - Downloading required model files
+# - Setting up permissions on different operating systems
+# - Configuring the environment
+# - Handling errors gracefully
+# 
+# It provides a smooth startup experience for users,
+# especially those who are new to eye tracking
+# ======================================================
+
 import os
 import sys
 import argparse
@@ -26,12 +41,14 @@ import traceback
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.FileHandler("sync_tracker_runner.log"), logging.StreamHandler()]
+    handlers=[logging.FileHandler(os.path.join("logs", "sync_tracker_runner.log")), logging.StreamHandler()]
 )
-logger = logging.getLogger("Runner")
+logger = logging.getLogger("SyncTrackerRunner")
 
 def check_dependencies():
     """Check if all required dependencies are installed"""
+    # This function verifies that all necessary libraries are available
+    # Without these, the application won't function properly
     try:
         import numpy
         import matplotlib
@@ -46,6 +63,8 @@ def check_dependencies():
 
 def check_model_files():
     """Check if required model files exist and download them if needed"""
+    # The eye tracking relies on a facial landmark detection model
+    # This function checks if it exists and downloads it if needed
     model_dir = os.path.join(os.path.dirname(__file__), "models")
     model_path = os.path.join(model_dir, "shape_predictor_68_face_landmarks.dat")
     
@@ -57,6 +76,7 @@ def check_model_files():
         
         try:
             # Show download progress message
+            # Asking permission before downloading large files is good practice
             root = tk.Tk()
             root.withdraw()
             proceed = messagebox.askyesno(
@@ -70,6 +90,7 @@ def check_model_files():
                 return False
                 
             # Different download methods based on platform
+            # Each operating system has its preferred approach
             if platform.system() == "Darwin":  # macOS
                 logger.info("Downloading model using curl (macOS)")
                 subprocess.run([
@@ -124,6 +145,8 @@ def check_model_files():
 
 def check_macos_permissions():
     """Check and guide user for macOS permissions required for tracking"""
+    # Mouse tracking requires special permissions on macOS
+    # This function guides the user through setting them up
     if platform.system() != "Darwin":
         return True  # Not on macOS, no need to check
         
@@ -135,12 +158,14 @@ def check_macos_permissions():
         root.withdraw()
         
         # Check which version of macOS we're on
+        # Different versions have different permission systems
         mac_version = platform.mac_ver()[0]
         logger.info(f"macOS Version: {mac_version}")
         
         major_version = int(mac_version.split('.')[0])
         
         # Ask user to set up permissions
+        # This step-by-step guidance helps users navigate system settings
         messagebox.showinfo(
             "macOS Permissions Required",
             "For mouse tracking to work, you need to grant Input Monitoring permission to Terminal "
@@ -175,13 +200,17 @@ def check_macos_permissions():
 
 def run_application(gaze_mode="webcam"):
     """Run the synchronized tracking application"""
+    # This is the main function that starts the actual tracking application
+    # after all setup steps have been completed
     try:
         logger.info(f"Starting sync_tracker_gui.py with gaze mode: {gaze_mode}")
         
         # Set environment variable for gaze mode
+        # This tells the application which tracking method to use
         os.environ['GAZE_TRACKER_MODE'] = gaze_mode
         
         # Import and run
+        # This dynamically loads the main application module
         from sync_tracker_gui import main
         main()
         
@@ -190,6 +219,7 @@ def run_application(gaze_mode="webcam"):
         logger.error(traceback.format_exc())
         
         # Show error message
+        # Providing clear error messages helps users troubleshoot problems
         root = tk.Tk()
         root.withdraw()
         messagebox.showerror(
@@ -203,6 +233,8 @@ def run_application(gaze_mode="webcam"):
 
 def main():
     """Main entry point"""
+    # This function orchestrates the entire setup and launch process
+    # It runs all checks in sequence and handles any issues
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Run Synchronized Mouse and Gaze Tracker')
     parser.add_argument('--gaze-mode', type=str, default='webcam',

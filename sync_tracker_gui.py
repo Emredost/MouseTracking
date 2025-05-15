@@ -1,6 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# ======================================================
+# Sync Tracker GUI - Combined eye and mouse tracking
+# 
+# This program provides a comprehensive interface for:
+# - Synchronized mouse and gaze tracking
+# - Real-time visualization of both inputs
+# - Analysis of eye-mouse coordination
+# - Distance and correlation measurements
+# - Comprehensive reports and visualizations
+# 
+# Perfect for studying attention and motor control
+# in human-computer interaction research
+# ======================================================
+
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import matplotlib.pyplot as plt
@@ -22,9 +36,9 @@ from mouse_analytics import MouseAnalytics
 
 # Set up logging
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.FileHandler("sync_tracker_gui.log"), logging.StreamHandler()]
+    handlers=[logging.FileHandler(os.path.join("logs", "sync_tracker_gui.log")), logging.StreamHandler()]
 )
 logger = logging.getLogger("SyncTrackerGUI")
 
@@ -33,6 +47,8 @@ class RealTimeTrajectoryPlot:
     
     def __init__(self, master, figsize=(8, 6), dpi=100):
         """Initialize the real-time plot"""
+        # This visualization shows both mouse and gaze paths together
+        # Allowing direct comparison of where users look vs. where they move
         self.master = master
         
         # Create figure and axis
@@ -43,14 +59,17 @@ class RealTimeTrajectoryPlot:
         self.ax.grid(True, alpha=0.3)
         
         # Create canvas
+        # This embeds the matplotlib plot in the tkinter interface
         self.canvas = FigureCanvasTkAgg(self.fig, master=master)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
         
         # Add toolbar
+        # Allows users to zoom, pan, save, and manipulate the visualization
         self.toolbar = NavigationToolbar2Tk(self.canvas, master)
         self.toolbar.update()
         
         # Initialize lines and points for plotting
+        # Different colors distinguish between mouse and gaze data
         self.mouse_line, = self.ax.plot([], [], '-', alpha=0.5, linewidth=1, color='blue', label='Mouse')
         self.gaze_line, = self.ax.plot([], [], '-', alpha=0.5, linewidth=1, color='red', label='Gaze')
         
@@ -58,6 +77,7 @@ class RealTimeTrajectoryPlot:
         self.gaze_fixations = self.ax.scatter([], [], color='purple', alpha=0.7, s=30, label='Gaze fixations')
         
         # Data storage
+        # Separate arrays for each type of data point
         self.mouse_x = []
         self.mouse_y = []
         self.gaze_x = []
@@ -71,6 +91,7 @@ class RealTimeTrajectoryPlot:
         self.ax.legend()
         
         # Invert y-axis to match screen coordinates
+        # Computer screens have (0,0) at the top-left
         self.ax.invert_yaxis()
         
         # Draw initial empty plot
@@ -81,6 +102,8 @@ class RealTimeTrajectoryPlot:
     
     def set_limits(self, x_range: Tuple[int, int] = None, y_range: Tuple[int, int] = None):
         """Set the axis limits"""
+        # This automatically detects the screen size for proper visualization
+        # It ensures the plot matches the actual screen dimensions
         if x_range is None:
             # Get screen width if possible, otherwise use a default
             try:
@@ -103,10 +126,14 @@ class RealTimeTrajectoryPlot:
     
     def update_plot(self, sync_events: List[Dict]) -> None:
         """Update the plot with new synchronized events"""
+        # This processes new synchronized events from both mouse and eye trackers
+        # It displays both data streams together for direct comparison
+        
         # Debug information
         logger.debug(f"Trajectory plot received {len(sync_events)} events")
         
         # Process events
+        # Different handling for mouse vs. gaze events
         has_new_data = False
         for event in sync_events:
             if event['event_type'].startswith('mouse_'):
@@ -130,8 +157,10 @@ class RealTimeTrajectoryPlot:
                     self.fixation_y.append(event['gaze_screen_y'])
         
         # If we have new data, update the plot
+        # This ensures we don't redraw unnecessarily
         if has_new_data:
             # Limit data points to prevent slowdown
+            # This keeps the visualization responsive
             max_points = 1000
             if len(self.mouse_x) > max_points:
                 self.mouse_x = self.mouse_x[-max_points:]
@@ -142,6 +171,7 @@ class RealTimeTrajectoryPlot:
                 self.gaze_y = self.gaze_y[-max_points:]
             
             # Update plots
+            # Refresh all visual elements with new data
             self.mouse_line.set_data(self.mouse_x, self.mouse_y)
             self.gaze_line.set_data(self.gaze_x, self.gaze_y)
             
@@ -152,6 +182,7 @@ class RealTimeTrajectoryPlot:
             logger.debug(f"Mouse points: {len(self.mouse_x)}, Gaze points: {len(self.gaze_x)}")
             
             # Update axis limits if needed
+            # Auto-adjusts the view to show all data points
             # Get min/max values with some padding
             if self.mouse_x or self.gaze_x:
                 all_x = self.mouse_x + self.gaze_x
@@ -173,6 +204,8 @@ class RealTimeTrajectoryPlot:
     
     def clear(self) -> None:
         """Clear the plot"""
+        # Reset all data and visual elements for a new session
+        # This is called when starting a new tracking session
         self.mouse_x = []
         self.mouse_y = []
         self.gaze_x = []
@@ -194,6 +227,8 @@ class DistancePlot:
     
     def __init__(self, master, figsize=(8, 4), dpi=100):
         """Initialize the distance plot"""
+        # This visualization shows the distance between gaze and mouse position
+        # It helps analyze coordination and eye-hand relationship
         self.master = master
         
         # Create figure and axis
@@ -292,6 +327,8 @@ class SyncTrackerGUI:
     
     def __init__(self, root):
         """Initialize the GUI"""
+        # This is the main application window that combines all tracking
+        # components and visualizations into a unified interface
         self.root = root
         root.title("Synchronized Mouse and Gaze Tracker")
         root.geometry("1280x900")
@@ -324,6 +361,8 @@ class SyncTrackerGUI:
     
     def create_menu(self):
         """Create the application menu"""
+        # This sets up the top menu with various commands organized by category
+        # It provides access to all the application's features
         menubar = tk.Menu(self.root)
         
         # File menu
@@ -350,6 +389,8 @@ class SyncTrackerGUI:
     
     def create_layout(self):
         """Create the main application layout"""
+        # This establishes the visual structure with tabs, controls,
+        # statistics display, and visualization areas
         # Create main frame
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.pack(fill=tk.BOTH, expand=True)
@@ -454,6 +495,8 @@ class SyncTrackerGUI:
     
     def on_gaze_mode_change(self, event):
         """Handle gaze mode change"""
+        # This updates the interface when switching between tracking methods
+        # (webcam, Tobii, or dummy tracking)
         new_mode = self.gaze_mode_var.get()
         if new_mode != self.gaze_mode:
             self.gaze_mode = new_mode
@@ -463,6 +506,8 @@ class SyncTrackerGUI:
     
     def start_tracking(self):
         """Start synchronized tracking"""
+        # This begins tracking both mouse and gaze simultaneously
+        # It initializes all trackers and starts data collection
         if self.is_tracking:
             logger.warning("Tracking already started")
             return
@@ -498,6 +543,8 @@ class SyncTrackerGUI:
     
     def stop_tracking(self):
         """Stop synchronized tracking"""
+        # This ends the tracking session and saves all collected data
+        # It also updates the interface to show the tracking has stopped
         if not self.is_tracking:
             logger.warning("Tracking not started")
             return
@@ -526,6 +573,8 @@ class SyncTrackerGUI:
     
     def update_stats(self):
         """Update statistics and visualizations"""
+        # This periodically refreshes all displayed information
+        # It updates both mouse and gaze data, plus coordination metrics
         if self.is_tracking and hasattr(self.tracker, 'sync_events'):
             # Calculate duration
             duration_secs = time.time() - self.tracker.start_time if hasattr(self.tracker, 'start_time') else 0
@@ -595,7 +644,9 @@ class SyncTrackerGUI:
         self.root.after(self.update_interval, self.update_stats)
     
     def generate_report(self):
-        """Generate synchronized tracking report"""
+        """Generate analytics report"""
+        # This creates a comprehensive analysis of both tracking streams
+        # The report includes visualizations and correlation metrics
         try:
             # Generate report using SyncTracker
             report_path = self.tracker.generate_report()
@@ -616,6 +667,8 @@ class SyncTrackerGUI:
     
     def show_settings(self):
         """Show settings dialog"""
+        # This displays a dialog for configuring all aspects of tracking
+        # It includes options for both mouse and gaze tracking methods
         settings_window = tk.Toplevel(self.root)
         settings_window.title("Settings")
         settings_window.geometry("500x400")
@@ -719,6 +772,8 @@ class SyncTrackerGUI:
     
     def show_about(self):
         """Show about dialog"""
+        # This displays information about the synchronized tracking system
+        # It includes version, features, and attribution details
         about_window = tk.Toplevel(self.root)
         about_window.title("About Sync Tracker")
         about_window.geometry("450x350")
@@ -749,7 +804,9 @@ class SyncTrackerGUI:
         ttk.Button(frame, text="Close", command=about_window.destroy).pack(pady=10)
 
     def clean_session(self):
-        """Clean the current session, resetting all data but maintaining the tracking mode"""
+        """Clean up the current session resources"""
+        # This properly closes and cleans up all resources
+        # It prevents memory leaks and ensures clean application shutdown
         try:
             # Ask for confirmation before cleaning
             if not messagebox.askyesno("Clean Session", 
@@ -803,6 +860,8 @@ class SyncTrackerGUI:
 
 def main():
     """Run the synchronized tracker GUI application"""
+    # This is the entry point when running the application directly
+    # It creates the main window and starts the GUI event loop
     root = tk.Tk()
     app = SyncTrackerGUI(root)
     root.mainloop()

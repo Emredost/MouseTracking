@@ -1,6 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# ======================================================
+# Sync Tracker - Combined mouse and gaze data engine
+# 
+# This core synchronization engine:
+# - Integrates mouse and eye tracking data streams
+# - Calculates metrics like eye-hand coordination
+# - Generates visualizations comparing both inputs
+# - Provides temporal analysis of attention patterns
+# - Creates comprehensive HTML and CSV reports
+# 
+# The foundation for advanced HCI research that
+# studies the relationship between looking and pointing
+# ======================================================
+
 import time
 import datetime
 import os
@@ -29,13 +43,15 @@ log_level = logging.DEBUG if DEBUG_MODE else logging.INFO
 logging.basicConfig(
     level=log_level,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.FileHandler("sync_tracker.log"), logging.StreamHandler()]
+    handlers=[logging.FileHandler(os.path.join("logs", "sync_tracker.log")), logging.StreamHandler()]
 )
 logger = logging.getLogger("SyncTracker")
 
 @dataclass
 class SyncEvent:
     """Data class for synchronized mouse and gaze events"""
+    # This structure combines data from both tracking systems
+    # into a unified format for analysis and visualization
     timestamp: float
     event_type: str  # 'mouse_move', 'mouse_click', 'mouse_scroll', 'gaze_fixation', 'gaze_saccade', 'gaze_blink'
     mouse_x: Optional[int] = None
@@ -67,10 +83,13 @@ class SyncTracker:
             gaze_mode: Gaze tracking mode ('webcam', 'tobii', or 'dummy')
             screen_resolution: Monitor resolution (width, height)
         """
+        # This creates a unified tracking system that combines
+        # mouse and gaze data streams with synchronized timestamps
         self.output_dir = output_dir
         self.gaze_mode = gaze_mode
         
         # Get screen resolution
+        # This auto-detects the display size for proper coordinate mapping
         if screen_resolution is None:
             try:
                 import tkinter as tk
@@ -87,12 +106,14 @@ class SyncTracker:
             self.screen_resolution = screen_resolution
         
         # Initialize trackers
+        # Both mouse and gaze trackers run independently but are synchronized
         self.mouse_tracker = MouseTracker(output_dir=output_dir)
         self.gaze_tracker = GazeTracker(output_dir=output_dir, 
                                         mode=gaze_mode,
                                         screen_resolution=self.screen_resolution)
         
         # Synchronization data
+        # This stores the combined stream of both tracking systems
         self.sync_events: List[SyncEvent] = []
         self.lock = threading.Lock()
         self.running = False
@@ -100,6 +121,7 @@ class SyncTracker:
         self.start_time = 0
         
         # Analysis metrics
+        # These track the relationship between gaze and mouse position
         self.total_distance = 0.0
         self.avg_distance = 0.0
         self.max_distance = 0.0
@@ -114,6 +136,8 @@ class SyncTracker:
     
     def _sync_events_thread(self):
         """Thread function to synchronize mouse and gaze events"""
+        # This background thread continuously integrates data from both tracking systems
+        # It runs at a fixed rate to ensure consistent timing and CPU usage
         last_processed_mouse_idx = 0
         last_processed_gaze_idx = 0
         sync_interval = 1/30  # 30Hz synchronization rate
@@ -122,16 +146,19 @@ class SyncTracker:
             current_time = time.time()
             
             # Get recent mouse events
+            # This collects any new mouse data since the last check
             with self.mouse_tracker.lock:
                 mouse_events = self.mouse_tracker.events[last_processed_mouse_idx:]
                 last_processed_mouse_idx = len(self.mouse_tracker.events)
             
             # Get recent gaze events
+            # This collects any new gaze data since the last check
             with self.gaze_tracker.lock:
                 gaze_events = self.gaze_tracker.events[last_processed_gaze_idx:]
                 last_processed_gaze_idx = len(self.gaze_tracker.events)
             
             # Process mouse events
+            # Each mouse event is converted to a synchronized event format
             for event in mouse_events:
                 # Convert MouseEvent to SyncEvent
                 if event.event_type == 'move':
@@ -164,6 +191,7 @@ class SyncTracker:
                     self._add_sync_event(sync_event)
             
             # Process gaze events
+            # Each gaze event is converted to a synchronized event format
             for event in gaze_events:
                 # Convert GazeEvent to SyncEvent
                 if event.event_type == 'fixation':
@@ -198,7 +226,9 @@ class SyncTracker:
             time.sleep(sync_interval)
     
     def _add_sync_event(self, event: SyncEvent):
-        """Add a synchronized event and calculate distance metrics if possible"""
+        """Add an event to the synchronized event list with distance calculation"""
+        # This enriches the synchronized events with distance metrics
+        # between mouse and gaze positions when both are available
         # Find the most recent mouse and gaze positions
         recent_mouse_pos = None
         recent_gaze_pos = None
@@ -262,11 +292,9 @@ class SyncTracker:
             self.sync_events.append(event)
     
     def start(self) -> bool:
-        """Start synchronized tracking
-        
-        Returns:
-            bool: True if tracking started successfully, False otherwise
-        """
+        """Start tracking mouse and gaze movements synchronously"""
+        # This activates both tracking systems and starts the synchronization thread
+        # Returns success/failure status to indicate if tracking started properly
         if self.running:
             logger.warning("Synchronized tracking already started")
             return True
@@ -294,7 +322,9 @@ class SyncTracker:
         return True
     
     def stop(self) -> None:
-        """Stop synchronized tracking"""
+        """Stop tracking and save data"""
+        # This gracefully shuts down all tracking systems and saves collected data
+        # It calculates final metrics before stopping the synchronization process
         if not self.running:
             logger.warning("Synchronized tracking not started")
             return
@@ -317,7 +347,9 @@ class SyncTracker:
         self._calculate_metrics()
     
     def _calculate_metrics(self) -> Dict[str, Any]:
-        """Calculate metrics from the synchronized data"""
+        """Calculate metrics about the relationship between mouse and gaze"""
+        # This analyzes the relationship between eye and mouse movements
+        # It generates metrics about coordination, attention, and behavior patterns
         # Already calculated during tracking:
         # - total_distance
         # - avg_distance
@@ -344,11 +376,9 @@ class SyncTracker:
         }
     
     def save_data(self) -> Tuple[str, str]:
-        """Save synchronized tracking data to files
-        
-        Returns:
-            Tuple[str, str]: Paths to the created CSV and JSON files
-        """
+        """Save synchronized data to JSON and CSV files"""
+        # This exports the collected data in both structured formats
+        # JSON preserves full detail, while CSV enables easy spreadsheet analysis
         if not self.sync_events:
             logger.warning("No synchronized events to save")
             return ("", "")
@@ -390,11 +420,9 @@ class SyncTracker:
         return (csv_path, json_path)
     
     def generate_heatmap_comparison(self) -> str:
-        """Generate a comparison heatmap visualization of mouse and gaze positions
-        
-        Returns:
-            str: Path to the saved figure
-        """
+        """Generate a heatmap comparing mouse and gaze positions"""
+        # This creates a side-by-side heatmap visualization showing
+        # where the mouse moved vs. where the user looked
         if not self.sync_events:
             logger.warning("No data to generate heatmap comparison")
             return ""
@@ -445,11 +473,9 @@ class SyncTracker:
         return fig_path
     
     def generate_distance_plot(self) -> str:
-        """Generate a plot of the distance between mouse and gaze over time
-        
-        Returns:
-            str: Path to the saved figure
-        """
+        """Generate a plot showing distance between mouse and gaze over time"""
+        # This visualizes the coordination between eye and hand
+        # Lower distances indicate tighter eye-hand coordination
         if not self.sync_events:
             logger.warning("No data to generate distance plot")
             return ""
@@ -511,11 +537,9 @@ class SyncTracker:
         return fig_path
     
     def generate_trajectory_comparison(self) -> str:
-        """Generate a comparison of mouse and gaze trajectories
-        
-        Returns:
-            str: Path to the saved figure
-        """
+        """Generate a trajectory plot comparing mouse and gaze paths"""
+        # This shows the actual paths taken by both tracking systems
+        # allowing direct comparison of movement patterns
         if not self.sync_events:
             logger.warning("No data to generate trajectory comparison")
             return ""
@@ -586,11 +610,9 @@ class SyncTracker:
         return fig_path
     
     def generate_report(self) -> str:
-        """Generate a comprehensive HTML report of synchronized tracking data
-        
-        Returns:
-            str: Path to the saved HTML report
-        """
+        """Generate a comprehensive HTML report of synchronized tracking"""
+        # This creates a complete analysis with all visualizations and metrics
+        # The HTML format makes it easy to view and share findings
         if not self.sync_events:
             logger.warning("No data to generate report")
             return ""
@@ -739,7 +761,9 @@ class SyncTracker:
         return report_path
         
 def main():
-    """Main function to run the synchronized tracker"""
+    """Run a basic synchronization demo"""
+    # This provides a simple command-line demonstration
+    # of the synchronization capabilities
     import argparse
     
     parser = argparse.ArgumentParser(description='Synchronized Mouse and Gaze Tracker')
