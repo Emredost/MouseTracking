@@ -77,6 +77,20 @@ class MouseTracker:
         self.last_event_time = 0
         self.lock = threading.Lock()  # Prevents data corruption when multiple threads access data
         
+        # Get screen resolution for coordinate bounds checking
+        try:
+            import tkinter as tk
+            root = tk.Tk()
+            self.screen_width = root.winfo_screenwidth()
+            self.screen_height = root.winfo_screenheight()
+            root.destroy()
+            logger.info(f"Screen resolution detected: {self.screen_width}x{self.screen_height}")
+        except:
+            # Default resolution if detection fails
+            self.screen_width = 1920
+            self.screen_height = 1080
+            logger.warning("Could not detect screen resolution. Using default: 1920x1080")
+        
         # Make sure we have a place to save our data
         os.makedirs(output_dir, exist_ok=True)
         
@@ -89,6 +103,25 @@ class MouseTracker:
         logger.debug(f"Using output directory: {self.output_dir}")
         logger.debug(f"Debug mode: {DEBUG_MODE}")
     
+    def _clamp_coordinates(self, x: int, y: int) -> Tuple[int, int]:
+        """
+        Ensure coordinates stay within screen bounds
+        
+        Args:
+            x, y: Raw coordinates
+            
+        Returns:
+            Clamped coordinates within screen bounds
+        """
+        clamped_x = max(0, min(self.screen_width - 1, x))
+        clamped_y = max(0, min(self.screen_height - 1, y))
+        
+        # Log if coordinates were out of bounds
+        if x != clamped_x or y != clamped_y:
+            logger.debug(f"Clamped coordinates from ({x}, {y}) to ({clamped_x}, {clamped_y})")
+        
+        return clamped_x, clamped_y
+    
     def on_move(self, x: int, y: int) -> None:
         """
         Called whenever the mouse moves to a new position
@@ -97,6 +130,9 @@ class MouseTracker:
             x, y: The new mouse coordinates
         """
         timestamp = time.time()
+        
+        # Clamp coordinates to screen bounds
+        x, y = self._clamp_coordinates(x, y)
         
         # Calculate how far the mouse has moved since last position
         if self.last_position != (0, 0): # Ignore the first move event
@@ -133,6 +169,9 @@ class MouseTracker:
         button_name = str(button).replace('Button.', '')
         timestamp = time.time()
         
+        # Clamp coordinates to screen bounds
+        x, y = self._clamp_coordinates(x, y)
+        
         # Store this click event safely so we can access it from multiple threads
         with self.lock:
             self.events.append(MouseEvent(
@@ -156,6 +195,9 @@ class MouseTracker:
             dx, dy: Amount scrolled horizontally and vertically
         """
         timestamp = time.time()
+        
+        # Clamp coordinates to screen bounds
+        x, y = self._clamp_coordinates(x, y)
         
         # Store this scroll event safely
         with self.lock:

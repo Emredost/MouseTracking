@@ -36,7 +36,7 @@ from gaze_tracker import GazeTracker, GazeEvent
 # Get environment variables
 DEFAULT_DATA_DIR = os.environ.get('MOUSE_TRACKER_DATA_DIR', os.path.join(os.getcwd(), "mouse_data"))
 DEBUG_MODE = os.environ.get('MOUSE_TRACKER_DEBUG', 'false').lower() == 'true'
-GAZE_TRACKER_MODE = os.environ.get('GAZE_TRACKER_MODE', 'dummy').lower()  # 'webcam', 'tobii', or 'dummy'
+GAZE_TRACKER_MODE = os.environ.get('GAZE_TRACKER_MODE', 'tobii_consumer').lower()  # 'webcam', 'tobii', 'tobii_consumer'
 
 # Set up logging
 log_level = logging.DEBUG if DEBUG_MODE else logging.INFO
@@ -80,7 +80,7 @@ class SyncTracker:
         
         Args:
             output_dir: Directory to save tracking data
-            gaze_mode: Gaze tracking mode ('webcam', 'tobii', or 'dummy')
+            gaze_mode: Gaze tracking mode ('webcam', 'tobii', 'tobii_consumer')
             screen_resolution: Monitor resolution (width, height)
         """
         # This creates a unified tracking system that combines
@@ -770,7 +770,7 @@ def main():
     parser.add_argument('--output', type=str, default=DEFAULT_DATA_DIR,
                         help='Output directory for tracking data')
     parser.add_argument('--gaze-mode', type=str, default=GAZE_TRACKER_MODE,
-                        choices=['webcam', 'tobii', 'dummy'],
+                        choices=['webcam', 'tobii', 'tobii_consumer'],
                         help='Gaze tracking mode')
     parser.add_argument('--duration', type=int, default=0,
                         help='Duration to track in seconds (0 for indefinite)')

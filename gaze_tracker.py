@@ -31,7 +31,7 @@ from typing import Dict, List, Tuple, Any, Optional, Union
 # This can be changed by setting the MOUSE_TRACKER_DATA_DIR environment variable
 DEFAULT_DATA_DIR = os.environ.get('MOUSE_TRACKER_DATA_DIR', os.path.join(os.getcwd(), "mouse_data"))
 DEBUG_MODE = os.environ.get('MOUSE_TRACKER_DEBUG', 'false').lower() == 'true'
-GAZE_TRACKER_MODE = os.environ.get('GAZE_TRACKER_MODE', 'webcam').lower()  # 'webcam', 'tobii', or 'dummy'
+GAZE_TRACKER_MODE = os.environ.get('GAZE_TRACKER_MODE', 'tobii_consumer').lower()  # 'webcam', 'tobii', 'tobii_consumer'
 
 # Setting up logging to track what's happening in the program
 log_level = logging.DEBUG if DEBUG_MODE else logging.INFO
@@ -71,14 +71,14 @@ class GazeTracker:
         
         Args:
             output_dir: Where to save the collected data
-            mode: Which tracking method to use ('webcam', 'tobii', or 'dummy')
+            mode: Which tracking method to use ('webcam', 'tobii', 'tobii_consumer')
             screen_resolution: The size of the screen in pixels (width, height)
         """
         # Storage for all gaze events
         self.events: List[GazeEvent] = [] # List to store gaze events
         self.running = False # Flag to control the tracking loop so we can stop it gracefully
         self.output_dir = output_dir # Directory to save data
-        self.mode = mode # Tracking mode: 'webcam', 'tobii', or 'dummy'
+        self.mode = mode # Tracking mode: 'webcam', 'tobii', 'tobii_consumer'
         self.tracker = None 
         self.lock = threading.Lock()  # Prevents data corruption when multiple threads access data
         self.calibrated = False # Flag to check if the tracker is calibrated
@@ -107,8 +107,12 @@ class GazeTracker:
             self._init_webcam_tracker()
         elif self.mode == 'tobii':
             self._init_tobii_tracker()
-        else:  # 'dummy' or fallback
-            self._init_dummy_tracker()
+        elif self.mode == 'tobii_consumer':
+            self._init_tobii_consumer_tracker()
+        else:  # Fallback to webcam
+            logger.warning(f"Unknown mode '{mode}', falling back to webcam")
+            self.mode = 'webcam'
+            self._init_webcam_tracker()
             
         # Tracking statistics
         self.total_fixation_duration = 0.0  # Total time spent on fixations
@@ -144,19 +148,15 @@ class GazeTracker:
                 logger.error(f"Face landmark model not found. Please download it from: "
                              f"http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2, "
                              f"extract it and place it in {model_dir}")
-                self.mode = 'dummy'
-                self._init_dummy_tracker()
-                return
+                raise RuntimeError("Required face landmark model not found for webcam tracking")
             
             self.predictor = dlib.shape_predictor(model_path)
             
             # Initialize webcam
             self.cap = cv2.VideoCapture(0)
             if not self.cap.isOpened():
-                logger.error("Could not open webcam. Falling back to dummy mode.")
-                self.mode = 'dummy'
-                self._init_dummy_tracker()
-                return
+                logger.error("Could not open webcam.")
+                raise RuntimeError("Could not open webcam for gaze tracking")
             
             # Set up thread for processing webcam frames
             self.frame_ready = threading.Event() # Event to signal when a frame is ready
@@ -175,9 +175,7 @@ class GazeTracker:
             logger.info("Webcam-based gaze tracker initialized")
         except Exception as e:
             logger.error(f"Error initializing webcam tracker: {e}")
-            logger.error("Falling back to dummy tracker mode")
-            self.mode = 'dummy'
-            self._init_dummy_tracker()
+            raise RuntimeError(f"Failed to initialize webcam tracker: {e}")
     
     def _init_tobii_tracker(self):
         """
@@ -194,10 +192,8 @@ class GazeTracker:
             eye_trackers = tr.find_all_eyetrackers() # List of all connected eye trackers
             
             if len(eye_trackers) == 0:
-                logger.error("No Tobii eye trackers found. Falling back to dummy mode.")
-                self.mode = 'dummy'
-                self._init_dummy_tracker()
-                return
+                logger.error("No Tobii eye trackers found.")
+                raise RuntimeError("No Tobii eye trackers found")
             
             # Use the first available tracker
             self.tracker = eye_trackers[0]
@@ -270,27 +266,113 @@ class GazeTracker:
             
             logger.info("Tobii eye tracker initialized")
         except ImportError:
-            logger.error("Tobii Research SDK not installed. Falling back to dummy mode.")
-            self.mode = 'dummy'
-            self._init_dummy_tracker()
+            logger.error("Tobii Research SDK not installed.")
+            raise RuntimeError("Tobii Research SDK not installed")
         except Exception as e:
             logger.error(f"Error initializing Tobii tracker: {e}")
-            logger.error("Falling back to dummy tracker mode")
-            self.mode = 'dummy'
-            self._init_dummy_tracker()
+            raise RuntimeError(f"Failed to initialize Tobii tracker: {e}")
     
-    def _init_dummy_tracker(self):
+    def _init_tobii_consumer_tracker(self):
         """
-        Initialize a dummy tracker that simulates gaze data
+        Initialize Tobii Eye Tracker 5 (Consumer Edition)
         
-        This is used when no real eye tracking is available,
-        creating realistic synthetic data for testing
+        This connects to the Tobii Eye Tracker 5 consumer edition
+        and sets up the data collection process using our custom SDK.
         """
-        self.mode = 'dummy'
-        # There's no actual initialization needed for the dummy mode,
-        # as it will just generate synthetic data
-        logger.info("Dummy gaze tracker initialized")
-        self.calibrated = True  # Dummy tracker is always "calibrated"
+        try:
+            # Import our custom Tobii Consumer SDK
+            from tobii_consumer_sdk import create_tobii_eye_tracker_5, TobiiGazeData
+            
+            # Create the eye tracker instance
+            self.tracker = create_tobii_eye_tracker_5()
+            
+            # Try to connect
+            if not self.tracker.connect():
+                logger.error("Failed to connect to Tobii Eye Tracker 5. Falling back to webcam mode.")
+                self.mode = 'webcam'
+                self._init_webcam_tracker()
+                return
+            
+            # Get device info
+            device_info = self.tracker.get_device_info()
+            logger.info(f"Connected to {device_info['model']} (S/N: {device_info['serial_number']})")
+            
+            # Create callback for gaze data
+            def gaze_data_callback(gaze_data: TobiiGazeData):
+                # Process and store gaze data
+                if gaze_data.left_gaze_point_valid or gaze_data.right_gaze_point_valid:
+                    # Use the valid eye, or average if both are valid
+                    x, y = 0.0, 0.0  # Normalized coordinates (0-1)
+                    valid_eyes = 0  # Count valid eyes
+                    
+                    if gaze_data.left_gaze_point_valid:
+                        x += gaze_data.left_gaze_point_x
+                        y += gaze_data.left_gaze_point_y
+                        valid_eyes += 1
+                    
+                    if gaze_data.right_gaze_point_valid:
+                        x += gaze_data.right_gaze_point_x
+                        y += gaze_data.right_gaze_point_y
+                        valid_eyes += 1
+                    
+                    if valid_eyes > 0:
+                        x /= valid_eyes
+                        y /= valid_eyes
+                        
+                        # Ensure normalized coordinates are within bounds [0,1]
+                        x = max(0.0, min(1.0, x))
+                        y = max(0.0, min(1.0, y))
+                        
+                        # Convert normalized coordinates to screen coordinates with proper bounds
+                        screen_x = int(x * self.screen_resolution[0])
+                        screen_y = int(y * self.screen_resolution[1])
+                        
+                        # Ensure screen coordinates stay within screen bounds
+                        screen_x = max(0, min(self.screen_resolution[0] - 1, screen_x))
+                        screen_y = max(0, min(self.screen_resolution[1] - 1, screen_y))
+                        
+                        # Get pupil size (average of both eyes if available)
+                        pupil_size = None
+                        if gaze_data.left_pupil_valid and gaze_data.right_pupil_valid:
+                            pupil_size = (gaze_data.left_pupil_diameter + gaze_data.right_pupil_diameter) / 2.0
+                        elif gaze_data.left_pupil_valid:
+                            pupil_size = gaze_data.left_pupil_diameter
+                        elif gaze_data.right_pupil_valid:
+                            pupil_size = gaze_data.right_pupil_diameter
+                        
+                        # Create gaze event
+                        event = GazeEvent(
+                            timestamp=gaze_data.timestamp,
+                            event_type='fixation',  # Simplified classification
+                            x=x,
+                            y=y,
+                            screen_x=screen_x,
+                            screen_y=screen_y,
+                            pupil_size=pupil_size,
+                            confidence=1.0 if valid_eyes == 2 else 0.7
+                        )
+                        
+                        with self.lock:
+                            self.events.append(event)
+            
+            # Store the callback for later use
+            self.gaze_callback = gaze_data_callback
+            
+            # Set the calibrated flag
+            self.calibrated = True
+            
+            logger.info("Tobii Eye Tracker 5 (Consumer Edition) initialized successfully")
+            
+        except ImportError as e:
+            logger.error(f"Could not import Tobii Consumer SDK: {e}. Falling back to webcam mode.")
+            self.mode = 'webcam'
+            self._init_webcam_tracker()
+        except Exception as e:
+            logger.error(f"Error initializing Tobii consumer tracker: {e}. Falling back to webcam mode.")
+            self.mode = 'webcam'
+            self._init_webcam_tracker()
+    
+
     
     def _process_webcam_frames(self):
         """
@@ -510,103 +592,7 @@ class GazeTracker:
             # Sleep to reduce CPU usage
             time.sleep(0.01)
     
-    def _generate_dummy_data(self):
-        """
-        Generate synthetic gaze data for the dummy tracker
-        
-        This creates realistic eye movement patterns including fixations,
-        saccades and blinks without requiring actual eye tracking hardware
-        """
-        # Parameters for the random walk
-        step_size = 0.01
-        fixation_duration = 0.5  # seconds
-        saccade_probability = 0.1
-        blink_probability = 0.01
-        
-        # Current position
-        x, y = 0.5, 0.5  # Start at center
-        
-        last_fixation_time = time.time()
-        fixation_id = 0
-        
-        while self.running:
-            current_time = time.time()
-            
-            # Random blink
-            if np.random.random() < blink_probability:
-                with self.lock:
-                    self.events.append(GazeEvent(
-                        timestamp=current_time,
-                        event_type='blink',
-                        confidence=1.0
-                    ))
-                    self.blink_count += 1
-                    
-                # Pause during blink
-                time.sleep(0.1)
-                continue
-            
-            # Check if it's time for a new fixation or continue current one
-            elapsed = current_time - last_fixation_time
-            
-            if elapsed >= fixation_duration or np.random.random() < saccade_probability:
-                # End current fixation
-                if elapsed > 0.1:  # Only count as fixation if it lasted a bit
-                    with self.lock:
-                        self.events.append(GazeEvent(
-                            timestamp=current_time,
-                            event_type='fixation',
-                            x=x,
-                            y=y,
-                            screen_x=int(x * self.screen_resolution[0]),
-                            screen_y=int(y * self.screen_resolution[1]),
-                            duration=elapsed,
-                            pupil_size=3.5 + 0.5 * np.random.random(),  # Random pupil size between 3.5-4.0mm
-                            confidence=0.8 + 0.2 * np.random.random()  # High confidence
-                        ))
-                        self.fixation_count += 1
-                        self.total_fixation_duration += elapsed
-                
-                # Make a saccade
-                with self.lock:
-                    self.events.append(GazeEvent(
-                        timestamp=current_time,
-                        event_type='saccade',
-                        confidence=0.7 + 0.3 * np.random.random()
-                    ))
-                    self.saccade_count += 1
-                
-                # Random new position (more realistic than small steps)
-                x = np.random.random()
-                y = np.random.random()
-                
-                # Start new fixation
-                last_fixation_time = current_time
-                fixation_id += 1
-            else:
-                # Small random walk during fixation (microsaccades)
-                x += step_size * np.random.normal()
-                y += step_size * np.random.normal()
-                
-                # Ensure x and y stay within bounds
-                x = max(0.0, min(1.0, x))
-                y = max(0.0, min(1.0, y))
-                
-                # Add some samples during fixation
-                with self.lock:
-                    self.events.append(GazeEvent(
-                        timestamp=current_time,
-                        event_type='fixation',
-                        x=x,
-                        y=y,
-                        screen_x=int(x * self.screen_resolution[0]),
-                        screen_y=int(y * self.screen_resolution[1]),
-                        pupil_size=3.5 + 0.5 * np.random.random(),  # Random pupil size
-                        confidence=0.8 + 0.2 * np.random.random()  # High confidence
-                    ))
-            
-            # Sleep to control sample rate
-            time.sleep(1/60)  # ~60Hz sampling rate
+
     
     def calibrate(self, calibration_points: List[Tuple[float, float]] = None):
         """
@@ -622,11 +608,7 @@ class GazeTracker:
         Returns:
             bool: True if calibration successful, False otherwise
         """
-        if self.mode == 'dummy':
-            # Dummy tracker doesn't need calibration
-            self.calibrated = True
-            logger.info("Dummy tracker calibration skipped")
-            return True
+
             
         if self.mode == 'tobii':
             try:
@@ -745,7 +727,7 @@ class GazeTracker:
             logger.warning("Gaze tracking already started")
             return True
         
-        if not self.calibrated and self.mode != 'dummy':
+        if not self.calibrated:
             logger.warning("Tracker not calibrated. Running calibration...")
             self.calibrate()
         
@@ -771,11 +753,21 @@ class GazeTracker:
                 self.running = False
                 return False
                 
-        elif self.mode == 'dummy':
-            # Start the dummy data generation thread
-            self.dummy_thread = threading.Thread(target=self._generate_dummy_data)
-            self.dummy_thread.daemon = True
-            self.dummy_thread.start()
+        elif self.mode == 'tobii_consumer':
+            try:
+                # Start gaze tracking using our custom SDK
+                if self.tracker.start_gaze_tracking(self.gaze_callback):
+                    logger.info("Started Tobii Eye Tracker 5 (Consumer Edition) gaze tracking")
+                else:
+                    logger.error("Failed to start Tobii Eye Tracker 5 gaze tracking")
+                    self.running = False
+                    return False
+            except Exception as e:
+                logger.error(f"Error starting Tobii consumer tracker: {e}")
+                self.running = False
+                return False
+                
+
         
         return True
     
@@ -808,6 +800,15 @@ class GazeTracker:
                 logger.info("Unsubscribed from Tobii gaze data")
             except Exception as e:
                 logger.error(f"Error stopping Tobii tracker: {e}")
+        
+        elif self.mode == 'tobii_consumer':
+            try:
+                # Stop gaze tracking and disconnect
+                self.tracker.stop_gaze_tracking()
+                self.tracker.disconnect()
+                logger.info("Stopped Tobii Eye Tracker 5 (Consumer Edition) gaze tracking")
+            except Exception as e:
+                logger.error(f"Error stopping Tobii consumer tracker: {e}")
         
         # Save the data
         self.save_data()
@@ -865,8 +866,8 @@ def main():
     parser.add_argument('--output', type=str, default='mouse_data',
                         help='Output directory for gaze data')
     parser.add_argument('--mode', type=str, default=GAZE_TRACKER_MODE,
-                        choices=['webcam', 'tobii', 'dummy'],
-                        help='Tracking mode (webcam, tobii, or dummy)')
+                                choices=['webcam', 'tobii', 'tobii_consumer'],
+        help='Tracking mode (webcam, tobii, or tobii_consumer)')
     parser.add_argument('--duration', type=int, default=0,
                         help='Duration to track in seconds (0 for indefinite)')
     args = parser.parse_args()
@@ -875,8 +876,7 @@ def main():
     
     try:
         # Calibrate if needed
-        if args.mode != 'dummy':
-            tracker.calibrate()
+        tracker.calibrate()
         
         # Start tracking
         tracker.start()

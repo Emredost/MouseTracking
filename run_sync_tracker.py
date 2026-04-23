@@ -9,7 +9,7 @@ This script provides an easy way to run the synchronized mouse and gaze tracker
 with proper error handling and environment setup.
 
 Usage:
-    python run_sync_tracker.py [--gaze-mode {webcam|tobii|dummy}]
+    python run_sync_tracker.py [--gaze-mode {webcam|tobii|tobii_consumer}]
 """
 
 # ======================================================
@@ -238,8 +238,8 @@ def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Run Synchronized Mouse and Gaze Tracker')
     parser.add_argument('--gaze-mode', type=str, default='webcam',
-                        choices=['webcam', 'tobii', 'dummy'],
-                        help='Gaze tracking mode (webcam, tobii, or dummy)')
+                                choices=['webcam', 'tobii', 'tobii_consumer'],
+        help='Gaze tracking mode (webcam, tobii, or tobii_consumer)')
     args = parser.parse_args()
     
     # Check dependencies
@@ -249,8 +249,8 @@ def main():
     
     # Check for model files
     if args.gaze_mode == 'webcam' and not check_model_files():
-        logger.warning("Missing model file. Falling back to dummy mode.")
-        args.gaze_mode = 'dummy'
+        logger.error("Missing model file for webcam mode.")
+        return False
     
     # Check macOS permissions
     if not check_macos_permissions():
